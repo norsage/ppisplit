@@ -589,7 +589,7 @@ def build_parser() -> argparse.ArgumentParser:
                           "becomes purpose-split: query = --csv set(s), target = these, "
                           "run in both directions. One (query, target) pair per question; "
                           "never pool, so adding a set cannot move another's verdicts.")
-    p_c.add_argument("--pdb-dir", required=True, help="Directory with PDB/CIF files")
+    p_c.add_argument("--pdb-dir", required=True, help="Directory with <uid>.pdb, .cif, .pdb.gz or .cif.gz files")
     p_c.add_argument("--output-dir", required=True, help="Output directory")
     p_c.add_argument("--sequence-source", default=DEFAULT_SEQUENCE_SOURCE,
                      choices=list(SEQUENCE_SOURCES),

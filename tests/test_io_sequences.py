@@ -194,3 +194,37 @@ def test_9f6o_myc_tag_is_seqres_only():
     assert any(myc in s for s in seqres.values())
     assert not any(myc in s for s in resolved.values())
     assert not any(myc in s for s in trimmed.values())
+
+
+# ---------------------------------------------------------------------------
+# Gzipped structures
+# ---------------------------------------------------------------------------
+
+def test_gzipped_structure_reads_like_the_plain_one(tmp_path):
+    """An archive of RCSB downloads (<uid>.cif.gz) is read in place, with the same sequences."""
+    import gzip
+    import shutil
+
+    plain = PDB_DIR / "1a22.pdb"
+    gz_dir = tmp_path / "gz"
+    gz_dir.mkdir()
+    with open(plain, "rb") as src, gzip.open(gz_dir / "1a22.pdb.gz", "wb") as dst:
+        shutil.copyfileobj(src, dst)
+
+    complexes = [ComplexInfo("1a22", ("B",), ("A",))]
+    n_plain = write_fasta(complexes, PDB_DIR, tmp_path / "plain.fasta")
+    n_gz = write_fasta(complexes, gz_dir, tmp_path / "gz.fasta")
+    assert n_plain == n_gz == 2
+    assert (tmp_path / "plain.fasta").read_text() == (tmp_path / "gz.fasta").read_text()
+
+
+def test_structure_lookup_order(tmp_path):
+    from ppisplit.io import find_structure
+
+    assert find_structure(tmp_path, "1abc") is None
+    (tmp_path / "1abc.cif.gz").write_bytes(b"")
+    assert find_structure(tmp_path, "1abc").name == "1abc.cif.gz"
+    (tmp_path / "1abc.cif").write_text("")
+    assert find_structure(tmp_path, "1abc").name == "1abc.cif"
+    (tmp_path / "1abc.pdb").write_text("")
+    assert find_structure(tmp_path, "1abc").name == "1abc.pdb"

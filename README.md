@@ -28,7 +28,7 @@ A dataset is a CSV with one row per complex. Three columns are required and any 
 
 | column | meaning |
 |---|---|
-| `uid` | complex id; the structure is read from `<pdb-dir>/<uid>.pdb`, or `.cif` if there is no `.pdb` |
+| `uid` | complex id; the structure is read from `<pdb-dir>/<uid>` with the first of `.pdb`, `.cif`, `.pdb.gz`, `.cif.gz` that exists |
 | `receptor_chains` | chain ids of one partner |
 | `ligand_chains` | chain ids of the other partner |
 
