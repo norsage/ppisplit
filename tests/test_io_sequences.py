@@ -1,4 +1,4 @@
-"""Sequence extraction: 'resolved' is the protocol, 'seqres' is the legacy path.
+"""Sequence extraction: 'seqres-trimmed' is the protocol; 'resolved' and 'seqres' are kept for older verdicts.
 
 The synthetic fixtures pin the semantics; the fixtures built from real PDBs pin
 the two worked examples from the protocol revision, using examples/pdb/.
@@ -84,6 +84,29 @@ def test_resolved_concatenates_across_an_internal_gap(tmp_path):
     assert len(extract_sequences_from_pdb(pdb, sequence_source="seqres")["A"]) == 24
 
 
+def test_seqres_trimmed_restores_an_internal_loop(tmp_path):
+    """Trimmed SEQRES keeps the residues between the first and last resolved ones."""
+    residues = [(i, ALA) for i in range(1, 6)] + [(i, GLY) for i in range(20, 25)]
+    seqres = {"A": [ALA] * 5 + [SER] * 14 + [GLY] * 5}
+    pdb = write_pdb(tmp_path / "gap.pdb", {"A": residues}, seqres=seqres)
+
+    assert extract_sequences_from_pdb(pdb, sequence_source="seqres-trimmed")["A"] == "A" * 5 + "S" * 14 + "G" * 5
+
+
+def test_seqres_trimmed_drops_unresolved_termini(tmp_path):
+    """An unresolved N-terminal tag and C-terminal tail are trimmed off."""
+    residues = [(i, ALA) for i in range(7, 17)]
+    seqres = {"A": ["HIS"] * 6 + [ALA] * 10 + [GLY] * 4}
+    pdb = write_pdb(tmp_path / "tag.pdb", {"A": residues}, seqres=seqres)
+
+    assert extract_sequences_from_pdb(pdb, sequence_source="seqres-trimmed")["A"] == "A" * 10
+
+
+def test_seqres_trimmed_falls_back_to_resolved_without_seqres(tmp_path):
+    pdb = write_pdb(tmp_path / "noseqres.pdb", {"A": [(1, ALA), (2, GLY), (5, SER)]})
+    assert extract_sequences_from_pdb(pdb, sequence_source="seqres-trimmed")["A"] == "AGS"
+
+
 def test_resolved_excludes_waters_and_ligands(tmp_path):
     pdb_text = (
         _atom_line(1, ALA, "A", 1) + "\n"
@@ -139,7 +162,7 @@ def test_extract_rejects_an_unknown_source(tmp_path):
         extract_sequences_from_pdb(pdb, sequence_source="alphafold")
 
 
-def test_write_fasta_defaults_to_resolved(tmp_path):
+def test_write_fasta_defaults_to_seqres_trimmed(tmp_path):
     write_pdb(
         tmp_path / "1abc.pdb",
         {"A": [(i, ALA) for i in range(1, 6)], "B": [(i, GLY) for i in range(1, 6)]},
@@ -148,7 +171,7 @@ def test_write_fasta_defaults_to_resolved(tmp_path):
     out = tmp_path / "seqs.fasta"
     n = write_fasta([ComplexInfo("1abc", ("A",), ("B",))], tmp_path, out)
     assert n == 2
-    assert DEFAULT_SEQUENCE_SOURCE == "resolved"
+    assert DEFAULT_SEQUENCE_SOURCE == "seqres-trimmed"
     assert ">1abc_A\nAAAAA\n" in out.read_text()
 
 
@@ -166,6 +189,8 @@ def test_9f6o_myc_tag_is_seqres_only():
     """The tag that made 9f6o look 0.909 identical to 2or9_P is unresolved."""
     myc = "EQKLISEEDL"
     resolved = extract_sequences_from_pdb(PDB_DIR / "9f6o.pdb", sequence_source="resolved")
+    trimmed = extract_sequences_from_pdb(PDB_DIR / "9f6o.pdb", sequence_source="seqres-trimmed")
     seqres = extract_sequences_from_pdb(PDB_DIR / "9f6o.pdb", sequence_source="seqres")
     assert any(myc in s for s in seqres.values())
     assert not any(myc in s for s in resolved.values())
+    assert not any(myc in s for s in trimmed.values())

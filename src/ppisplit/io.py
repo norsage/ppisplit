@@ -1,25 +1,28 @@
 """I/O for annotations, PDB files, and FASTAs.
 
-Two sequence sources are available; ``resolved`` is the default and the
-canonical one.
+Three sequence sources are available; ``seqres-trimmed`` is the default.
+
+``seqres-trimmed``
+    The SEQRES slice from the first to the last resolved residue of a chain.
+    Unresolved termini, purification tags among them, stay out; unresolved
+    internal loops are kept, so a loop that is ordered in one entry and
+    disordered in another does not change the comparison.
 
 ``resolved``
-    Amino-acid residues actually present in model 0 of the deposited
-    structure. This is what the model sees, and it is the only source that
-    keeps the post-filter's coverage denominators honest.
+    Amino-acid residues present in model 0 of the deposited structure, with
+    internal gaps joined. Kept to reproduce older verdicts.
 
 ``seqres``
     Entity-level full sequences (gemmi ``entity.full_sequence``), including
-    signal peptides, purification tags and unresolved loops. Retained only to
-    reproduce historical verdicts.
+    signal peptides, purification tags and unresolved loops. Kept to
+    reproduce older verdicts.
 
-Why the default changed: SEQRES both *invents* similarity and
-*hides* it. 1,290 of 8,515 chains in the audit universe carry a purification
-tag motif and 94.7% of those instances are unresolved, so e.g. ``9f6o`` scores
-0.909 against the anti-myc Fab peptide ``2or9_P`` under SEQRES and 0.044 under
-resolved. In the other direction SEQRES inflates the coverage denominator and
-hides real leaks: ``6lsa_F ~ 4myw_A`` scores 0.208 (fail) under SEQRES and
-0.263 (pass) under resolved, on an identical alignment.
+Why full SEQRES is not used: unresolved tags invent similarity. 1,290 of
+8,515 chains in the audit universe carry a purification tag motif and 94.7%
+of those instances are unresolved, so e.g. ``9f6o`` scores 0.909 against the
+anti-myc Fab peptide ``2or9_P`` under SEQRES and 0.044 under resolved. Unresolved
+residues also inflate the coverage denominator: ``6lsa_F ~ 4myw_A`` scores
+0.208 under SEQRES and 0.263 under resolved, on an identical alignment.
 """
 
 from __future__ import annotations
@@ -36,8 +39,8 @@ from ppisplit.types import ChainKey, ComplexInfo
 
 REQUIRED_COLUMNS = ("uid", "receptor_chains", "ligand_chains")
 
-SEQUENCE_SOURCES = ("resolved", "seqres")
-DEFAULT_SEQUENCE_SOURCE = "resolved"
+SEQUENCE_SOURCES = ("seqres-trimmed", "resolved", "seqres")
+DEFAULT_SEQUENCE_SOURCE = "seqres-trimmed"
 
 MIN_CHAIN_LENGTH = 3
 
@@ -79,6 +82,43 @@ def _seqres_sequences(st: gemmi.Structure) -> dict[str, str]:
             seq = gemmi.one_letter_code(entity.full_sequence)
             if seq:
                 sequences[entity.name] = seq
+    return sequences
+
+
+def _one_letter(name: str) -> str | None:
+    """One-letter code of an amino acid; microheterogeneity takes the first alternative."""
+    info = gemmi.find_tabulated_residue(name.split(",")[0])
+    if info is not None and info.is_amino_acid():
+        return info.one_letter_code.upper()
+    return None
+
+
+def _seqres_trimmed_sequences(st: gemmi.Structure) -> dict[str, str]:
+    """SEQRES from the first to the last resolved residue, keyed by chain id.
+
+    Resolved residues are placed on the entity sequence by gemmi's
+    ``label_seq`` (read from mmCIF, aligned to SEQRES for PDB files). The
+    slice keeps unresolved internal loops and drops the termini that were
+    never observed, purification tags included. A chain whose residues
+    cannot be placed (no entity sequence, no ``label_seq``) falls back to its
+    resolved sequence. Chains with no amino acid are absent.
+    """
+    st.assign_label_seq_id(force=False)
+    sequences: dict[str, str] = {}
+    for chain in st[0]:
+        residues = [r for r in chain if _one_letter(r.name)]
+        if not residues:
+            continue
+        resolved = "".join(_one_letter(r.name) for r in residues)
+        polymer = chain.get_polymer()
+        entity = st.get_entity_of(polymer) if len(polymer) else None
+        placed = [r.label_seq for r in residues if r.label_seq is not None and r.label_seq > 0]
+        if entity is None or not entity.full_sequence or not placed:
+            sequences[chain.name] = resolved
+            continue
+        full = entity.full_sequence
+        trimmed = (_one_letter(name) for name in full[min(placed) - 1 : max(placed)])
+        sequences[chain.name] = "".join(c for c in trimmed if c)
     return sequences
 
 
@@ -135,6 +175,9 @@ def extract_sequences_from_pdb(
     st.assign_subchains()
     st.ensure_entities()
 
+    if sequence_source == "seqres-trimmed":
+        st.deduplicate_entities()
+        return _seqres_trimmed_sequences(st)
     if sequence_source == "resolved":
         return _resolved_sequences(st)
 

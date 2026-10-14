@@ -117,7 +117,13 @@ for x in [0.16, 0.24, 0.32]:
 
 ## Design decisions
 
-**Sequences come from the coordinates.** With `--sequence-source resolved`, the default, a chain's sequence is the amino-acid residues present in model 0 of the structure, and a chain with none (DNA, a ligand) is left out of the comparison. SEQRES sequences also contain purification tags, signal peptides and unresolved loops, and that causes errors in both directions. In a set of 8,515 chains, 1,290 carry a purification-tag motif, and 94.7% of those tags are unresolved. Under SEQRES, `9f6o` scores 0.909 against the anti-myc Fab peptide `2or9_P` because of the tag alone; from the coordinates it scores 0.044. Unresolved residues also enlarge the coverage denominator and hide real similarity: `6lsa_F ~ 4myw_A` scores 0.208 under SEQRES and 0.263 from the coordinates, on the same alignment. `--sequence-source seqres` exists to reproduce older results.
+**Sequences are trimmed SEQRES.** With `--sequence-source seqres-trimmed`, the default, a chain's sequence is its SEQRES from the first to the last resolved residue in model 0; resolved residues are placed on SEQRES by gemmi's `label_seq`. A chain with no amino acids (DNA, a ligand) is left out of the comparison, and a chain whose residues cannot be placed on a SEQRES falls back to its resolved residues.
+
+Trimming leaves out unresolved termini. Full SEQRES keeps them, and they include purification tags: in a set of 8,515 chains, 1,290 carry a purification-tag motif, and 94.7% of those tags are unresolved. Under full SEQRES, `9f6o` scores 0.909 against the anti-myc Fab peptide `2or9_P` because of the tag alone; on resolved residues it scores 0.044, and trimmed SEQRES leaves the tag out too. Unresolved residues also enlarge the coverage denominator: `6lsa_F ~ 4myw_A` scores 0.208 under full SEQRES and 0.263 on resolved residues, on the same alignment.
+
+Trimmed SEQRES keeps unresolved internal loops. Comparing only the resolved residues makes a verdict depend on whether a loop happened to be ordered in a given crystal. Across 8,871 chains, 26% gain at least one residue under trimming and 11% gain ten or more. Changed verdicts sit near the threshold: every chain pair whose verdict differs between the two sources scores between 0.237 and 0.30.
+
+`--sequence-source resolved` and `--sequence-source seqres` reproduce older results.
 
 **Search settings never filter a hit.** MMseqs2 runs with no identity or coverage floor, sensitivity 7.5, E-value `1e30`, and `--max-seqs` set from the size of the target database, so every hit reaches the similarity rule. A lower E-value cutoff makes verdicts depend on the database size: with `-e 0.1`, the same chain pairs got 73,419 different verdicts in a 4,574-chain and an 8,515-chain database, and with `1e30` none did. The settings are in `ppisplit.search.SEARCH_SETTINGS`.
 

@@ -53,10 +53,12 @@ def test_out_of_range_hyperbola_x_is_rejected(x):
     assert exc.value.code == 2
 
 
-def test_sequence_source_defaults_to_resolved():
-    """SEQRES both invents similarity (unresolved tags) and hides it (inflated
-    coverage denominators). It stays reachable only for historical verdicts."""
-    assert _cluster_args().sequence_source == "resolved"
+def test_sequence_source_defaults_to_seqres_trimmed():
+    """Full SEQRES invents similarity through unresolved tags; resolved residues
+    make a verdict depend on which entry happened to order a loop. Trimmed SEQRES
+    avoids both. The other two stay reachable for older verdicts."""
+    assert _cluster_args().sequence_source == "seqres-trimmed"
+    assert _cluster_args("--sequence-source", "resolved").sequence_source == "resolved"
     assert _cluster_args("--sequence-source", "seqres").sequence_source == "seqres"
 
 

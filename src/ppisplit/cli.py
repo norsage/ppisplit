@@ -593,10 +593,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_c.add_argument("--output-dir", required=True, help="Output directory")
     p_c.add_argument("--sequence-source", default=DEFAULT_SEQUENCE_SOURCE,
                      choices=list(SEQUENCE_SOURCES),
-                     help="Which sequence to compare: 'resolved' (default, residues "
-                          "present in the model) or 'seqres' (legacy, entity-level full "
-                          "sequence — inflates coverage denominators and matches on "
-                          "unresolved purification tags)")
+                     help="Which sequence to compare: 'seqres-trimmed' (default, SEQRES from the "
+                          "first to the last resolved residue), 'resolved' (residues "
+                          "present in the model) or 'seqres' (full entity sequence, "
+                          "including unresolved tags and termini). 'resolved' and "
+                          "'seqres' reproduce older verdicts.")
     p_c.add_argument("--predicate", default="hyperbola", choices=["hyperbola", "rectangle"],
                      help="Post-filter predicate kind (default: hyperbola, the canonical rule; "
                           "rectangle is legacy, for reproducing historical numbers)")
