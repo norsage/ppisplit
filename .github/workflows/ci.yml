@@ -1,0 +1,21 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install MMseqs2
+        run: |
+          curl -fsSL https://mmseqs.com/latest/mmseqs-linux-avx2.tar.gz | tar xz
+          echo "$PWD/mmseqs/bin" >> "$GITHUB_PATH"
+      - run: uv sync --extra test --python ${{ matrix.python }}
+      - run: mmseqs version
+      - run: uv run pytest -q

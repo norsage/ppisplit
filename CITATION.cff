@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use ppisplit, please cite it as below."
+title: "ppisplit: sequence-aware cross-validation splitting and leak detection for protein-protein interaction datasets"
+type: software
+authors:
+  - family-names: Sarapulov
+    given-names: Georgii
+license: MIT
+repository-code: "https://github.com/norsage/ppisplit"
