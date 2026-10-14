@@ -196,6 +196,20 @@ def extract_sequences_from_pdb(
     return sequences
 
 
+#: Where a structure is looked for, first match wins. gemmi reads the gzipped
+#: forms directly, so an archive of RCSB downloads needs no unpacking.
+STRUCTURE_SUFFIXES = (".pdb", ".cif", ".pdb.gz", ".cif.gz")
+
+
+def find_structure(pdb_dir: Path, uid: str) -> Path | None:
+    """``<pdb_dir>/<uid>`` with the first of :data:`STRUCTURE_SUFFIXES` that exists."""
+    for suffix in STRUCTURE_SUFFIXES:
+        path = pdb_dir / f"{uid}{suffix}"
+        if path.exists():
+            return path
+    return None
+
+
 def write_fasta(
     complexes: Iterable[ComplexInfo],
     pdb_dir: Path,
@@ -218,10 +232,8 @@ def write_fasta(
     with open(output_path, "w") as f:
         for c in complexes:
             uid = c.uid.lower()
-            pdb_path = pdb_dir / f"{uid}.pdb"
-            if not pdb_path.exists():
-                pdb_path = pdb_dir / f"{uid}.cif"
-            if not pdb_path.exists():
+            pdb_path = find_structure(pdb_dir, uid)
+            if pdb_path is None:
                 missing.append(uid)
                 continue
 
