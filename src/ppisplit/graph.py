@@ -54,6 +54,18 @@ class UnionFind:
         return dict(groups)
 
 
+def numbered_components(uf: UnionFind) -> list[list[str]]:
+    """Components ordered by their smallest member: the cluster id is the index.
+
+    The root of a component depends on the order of the unions, and that order
+    comes from iterating sets of strings, which changes with ``PYTHONHASHSEED``
+    from one process to the next. Numbering by root made cluster ids, and the
+    Monte Carlo splits drawn over them, differ between runs on the same input.
+    The smallest member depends on the members only.
+    """
+    return sorted(uf.components().values(), key=min)
+
+
 def chain_clusters_from_edges(
     edges: pd.DataFrame,
     all_chains: Iterable[ChainKey],
@@ -63,8 +75,7 @@ def chain_clusters_from_edges(
     ``edges`` must have ``query`` and ``target`` columns. Chains in
     ``all_chains`` with no edges become singleton clusters.
 
-    Returns ``{chain_key: cluster_id}`` with cluster_ids assigned by
-    sorted-rep order for determinism.
+    Returns ``{chain_key: cluster_id}``, numbered as in :func:`numbered_components`.
     """
     uf = UnionFind(all_chains)
     if not edges.empty:
@@ -72,9 +83,8 @@ def chain_clusters_from_edges(
             if q in uf.parent and t in uf.parent:
                 uf.union(q, t)
 
-    components = uf.components()
     chain_clusters: dict[ChainKey, int] = {}
-    for cluster_id, (_, members) in enumerate(sorted(components.items())):
+    for cluster_id, members in enumerate(numbered_components(uf)):
         for ch in members:
             chain_clusters[ch] = cluster_id
     return chain_clusters
@@ -157,7 +167,7 @@ def complex_clusters_from_edges(
     (when given) are skipped, matching the old behaviour for UIDs missing from
     the search universe.
 
-    Returns ``{uid: complex_cluster_id}``.
+    Returns ``{uid: complex_cluster_id}``, numbered as in :func:`numbered_components`.
     """
     if similarity_mode not in _VALID_SIMILARITY_MODES:
         raise ValueError(
@@ -190,9 +200,8 @@ def complex_clusters_from_edges(
             if complexes_are_similar(c, by_uid[other_uid], sim, similarity_mode):
                 uf.union(c.uid, other_uid)
 
-    components = uf.components()
     uid_to_cluster: dict[str, int] = {}
-    for cluster_id, (_, members) in enumerate(sorted(components.items())):
+    for cluster_id, members in enumerate(numbered_components(uf)):
         for uid in members:
             uid_to_cluster[uid] = cluster_id
     return uid_to_cluster
