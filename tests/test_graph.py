@@ -1,3 +1,8 @@
+import json
+import os
+import subprocess
+import sys
+
 import pandas as pd
 import pytest
 
@@ -8,6 +13,7 @@ from ppisplit.graph import (
     complexes_are_similar,
     exclude_test_clusters,
     group_clusters,
+    numbered_components,
     similarity_map,
 )
 from ppisplit.types import ComplexInfo
@@ -181,3 +187,49 @@ def test_group_clusters_inversion():
     uid_to_cluster = {"a": 0, "b": 0, "c": 1}
     grouped = group_clusters(uid_to_cluster)
     assert grouped == {0: ["a", "b"], 1: ["c"]} or grouped == {0: ["b", "a"], 1: ["c"]}
+
+
+def test_numbered_components_do_not_depend_on_union_order():
+    forward, backward = UnionFind(["a", "b", "c", "d", "e"]), UnionFind(["a", "b", "c", "d", "e"])
+    for x, y in [("c", "a"), ("d", "b"), ("e", "d")]:
+        forward.union(x, y)
+    for x, y in [("d", "e"), ("b", "d"), ("a", "c")]:
+        backward.union(x, y)
+    want = [["a", "c"], ["b", "d", "e"]]
+    assert [sorted(m) for m in numbered_components(forward)] == want
+    assert [sorted(m) for m in numbered_components(backward)] == want
+
+
+CLUSTERS_SCRIPT = """
+import json
+import random
+import pandas as pd
+from ppisplit.graph import complex_clusters_from_edges
+from ppisplit.types import ComplexInfo
+
+# a sparse random graph: some complexes join two trees of equal rank, and which
+# root survives follows the iteration order of a set of uids
+rng = random.Random(0)
+uids = [f"u{i:03d}" for i in range(200)]
+complexes = [ComplexInfo(u, receptor_chains=("A",), ligand_chains=("B",)) for u in uids]
+pairs = []
+for _ in range(150):
+    a, b = rng.sample(uids, 2)
+    pairs += [(f"{a}_A", f"{b}_A"), (f"{a}_B", f"{b}_B")]
+edges = pd.DataFrame(pairs, columns=["query", "target"])
+print(json.dumps(complex_clusters_from_edges(complexes, edges, "both"), sort_keys=True))
+"""
+
+
+def test_complex_cluster_ids_do_not_depend_on_hash_seed():
+    outputs = set()
+    for seed in ("1", "2", "3", "4"):
+        env = {**os.environ, "PYTHONHASHSEED": seed}
+        run = subprocess.run(
+            [sys.executable, "-c", CLUSTERS_SCRIPT], env=env, capture_output=True, text=True, check=True
+        )
+        outputs.add(run.stdout)
+    assert len(outputs) == 1
+    clusters = json.loads(outputs.pop())
+    smallest = [min(u for u, c in clusters.items() if c == k) for k in range(max(clusters.values()) + 1)]
+    assert smallest == sorted(smallest)
