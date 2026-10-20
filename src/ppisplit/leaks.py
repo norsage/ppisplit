@@ -104,9 +104,9 @@ def detect_leaks(
         )
 
     # Direct UID overlap is the strongest possible leak — same complex appears in
-    # both test and train. Pairwise mmseqs hits get filtered as self-matches at
-    # the chain-key level, so the predicate-based path misses these without an
-    # explicit check.
+    # both test and train. The purpose-split search keeps same-identifier hits, so
+    # the predicate path catches these too; this check stays as a backstop for a
+    # complex whose chains yield no sequence (and so no hit at all).
     direct_overlap = test_uids & train_uids
 
     evidence_cols = [*hits.columns.tolist(), _LEAK_TYPE_COL]

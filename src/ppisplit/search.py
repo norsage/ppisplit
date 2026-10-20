@@ -178,7 +178,9 @@ def run_mmseqs_search_pair(
         "qcov": "tcov", "tcov": "qcov",
     })
     combined = pd.concat([fwd, rev[list(HIT_COLUMNS)]], ignore_index=True)
-    combined = combined[combined["query"] != combined["target"]]
+    # No self-hit removal here: the two databases are different sets, so a query and a
+    # target record sharing an identifier are one chain present in both — a leak, not
+    # a self-match. Dropping them hid such chains from the predicate.
     return (
         combined.drop_duplicates(subset=["query", "target"], keep="first")
         .reset_index(drop=True)
