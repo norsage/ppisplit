@@ -231,7 +231,7 @@ def write_fasta(
     empty_chains: list[str] = []
     with open(output_path, "w") as f:
         for c in complexes:
-            uid = c.uid.lower()
+            uid = c.uid
             pdb_path = find_structure(pdb_dir, uid)
             if pdb_path is None:
                 missing.append(uid)
