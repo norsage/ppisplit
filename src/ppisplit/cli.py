@@ -75,6 +75,32 @@ FASTA_FILENAME = "sequences.fasta"
 TARGET_FASTA_FILENAME = "sequences_target.fasta"
 
 
+def require_known_chains(complexes, known_chains: set[str], command: str) -> None:
+    """Exit if not one chain of ``complexes`` is in the cluster directory's FASTA.
+
+    That happens when the CSV does not belong to the cluster run, or when its uids are
+    spelled differently from the ones ``cluster`` wrote (task 0001.z9r: upper-case uids
+    against lower-cased headers). Without this check every complex is skipped and the
+    command reports empty clusters, folds or leaks with exit 0.
+    """
+    if complexes and not any(k in known_chains for c in complexes for k in c.chain_keys()):
+        sample = ", ".join(sorted(known_chains)[:3])
+        print(
+            f"Error: {command}: none of the {len(complexes)} complexes has a chain in the "
+            f"cluster directory's FASTA (it holds e.g. {sample}). Was the cluster run made "
+            "from this CSV, with uids spelled the same way?",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+def _cluster_chain_keys(cluster_dir: Path) -> set[str]:
+    """Chain keys written by ``cluster``: the query FASTA, plus the target FASTA if any."""
+    keys = read_fasta_keys(cluster_dir / FASTA_FILENAME)
+    target = cluster_dir / TARGET_FASTA_FILENAME
+    return keys | read_fasta_keys(target) if target.exists() else keys
+
+
 # ---------------------------------------------------------------------------
 # Subcommand: cluster
 # ---------------------------------------------------------------------------
@@ -220,6 +246,7 @@ def cmd_split(args: argparse.Namespace) -> None:
     test_csv_paths = [Path(p) for p in (args.test_csv or [])]
     test_complexes = load_annotations(*test_csv_paths) if test_csv_paths else []
     all_complexes = train_complexes + test_complexes
+    require_known_chains(all_complexes, all_chains, "split")
 
     # Complex adjacency comes from the direct chain edges. Chain clusters are
     # NOT an input here — cluster co-membership is a transitive closure and is
@@ -297,6 +324,9 @@ def cmd_check_leaks(args: argparse.Namespace) -> None:
     train_uids = {c.uid for c in train_complexes}
     test_uids = {c.uid for c in test_complexes}
     chain_role = chain_role_map([*train_complexes, *test_complexes])
+    known = _cluster_chain_keys(cluster_dir)
+    require_known_chains(test_complexes, known, "check-leaks")
+    require_known_chains(train_complexes, known, "check-leaks")
 
     report = detect_leaks(
         hits=hits,
@@ -397,6 +427,7 @@ def cmd_clean_test_set(args: argparse.Namespace) -> None:
     hits = pd.read_parquet(cluster_dir / HITS_FILENAME)
     test_complexes = load_annotations(Path(args.test_csv))
     test_uids = {c.uid for c in test_complexes}
+    require_known_chains(test_complexes, _cluster_chain_keys(cluster_dir), "clean-test-set")
     test_df = pd.read_csv(args.test_csv)
 
     train_csv_paths = [Path(p) for p in args.train_csv]
@@ -406,6 +437,7 @@ def cmd_clean_test_set(args: argparse.Namespace) -> None:
         train_complexes = load_annotations(train_path)
         train_uids = {c.uid for c in train_complexes}
         chain_role = chain_role_map([*train_complexes, *test_complexes])
+        require_known_chains(train_complexes, _cluster_chain_keys(cluster_dir), "clean-test-set")
 
         report = detect_leaks(
             hits=hits,
@@ -517,6 +549,7 @@ def cmd_summary(args: argparse.Namespace) -> None:
         test_complexes = load_annotations(*test_paths)
 
     all_complexes = train_complexes + test_complexes
+    require_known_chains(all_complexes, all_chains, "summary")
     uid_to_cluster = complex_clusters_from_edges(
         all_complexes, edges,
         similarity_mode=args.similarity_mode,
