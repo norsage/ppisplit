@@ -40,7 +40,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from ppisplit.folds import assign_kfold, assign_montecarlo
+from ppisplit.folds import assign_kfold, assign_montecarlo, assign_montecarlo_balanced
 from ppisplit.graph import (
     chain_clusters_from_edges,
     complex_clusters_from_edges,
@@ -286,6 +286,10 @@ def cmd_split(args: argparse.Namespace) -> None:
         }
         grouped = {cid: uids for cid, uids in grouped.items() if uids}
 
+    if args.weights and args.mode != "montecarlo-balanced":
+        print("Error: --weights applies to montecarlo-balanced mode only", file=sys.stderr)
+        sys.exit(1)
+
     if args.mode == "kfold":
         if not args.n_folds:
             print("Error: --n-folds required for kfold mode", file=sys.stderr)
@@ -297,6 +301,18 @@ def cmd_split(args: argparse.Namespace) -> None:
             sys.exit(1)
         folds_df = assign_montecarlo(
             grouped, n_splits=args.n_splits, val_ratio=args.val_ratio, seed=args.seed
+        )
+    elif args.mode == "montecarlo-balanced":
+        if not args.n_splits:
+            print("Error: --n-splits required for montecarlo-balanced mode", file=sys.stderr)
+            sys.exit(1)
+        weights = None
+        if args.weights:
+            table = pd.read_csv(args.weights, dtype={"uid": str})
+            weights = dict(zip(table["uid"], table["weight"].astype(float)))
+        folds_df = assign_montecarlo_balanced(
+            grouped, n_splits=args.n_splits, val_ratio=args.val_ratio, seed=args.seed,
+            large_threshold=args.large_threshold, weights=weights,
         )
     else:
         print(f"Error: unknown mode {args.mode}", file=sys.stderr)
@@ -653,11 +669,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_s.add_argument("--csv", required=True, help="Train/val annotation CSV")
     p_s.add_argument("--cluster-dir", required=True, help="Directory from cluster step")
     p_s.add_argument("--output", required=True, help="Output folds CSV")
-    p_s.add_argument("--mode", required=True, choices=["kfold", "montecarlo"])
+    p_s.add_argument("--mode", required=True, choices=["kfold", "montecarlo", "montecarlo-balanced"])
     p_s.add_argument("--n-folds", type=int)
     p_s.add_argument("--n-splits", type=int)
     p_s.add_argument("--val-ratio", type=float, default=0.25)
     p_s.add_argument("--seed", type=int, default=42)
+    p_s.add_argument("--large-threshold", type=float, default=15,
+                     help="montecarlo-balanced: a cluster larger than this (in weight units) "
+                          "goes to val by a coin flip, the smaller ones fill val up to "
+                          "--val-ratio (default: 15)")
+    p_s.add_argument("--weights",
+                     help="montecarlo-balanced: CSV with columns uid, weight; a cluster's size "
+                          "is the sum of its uids' weights (default: 1 per uid)")
     p_s.add_argument("--similarity-mode", default="both",
                      choices=["both", "receptor-only", "ligand-only", "either"])
     p_s.add_argument("--test-csv", action="append", default=[],

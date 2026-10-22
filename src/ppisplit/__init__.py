@@ -17,7 +17,7 @@ Public API exposes each component independently so callers can swap
 implementations without rewriting the orchestration.
 """
 
-from ppisplit.folds import assign_kfold, assign_montecarlo
+from ppisplit.folds import assign_kfold, assign_montecarlo, assign_montecarlo_balanced
 from ppisplit.graph import (
     UnionFind,
     chain_clusters_from_edges,
@@ -61,6 +61,7 @@ __all__ = [
     "UnionOfPredicates",
     "assign_kfold",
     "assign_montecarlo",
+    "assign_montecarlo_balanced",
     "chain_clusters_from_edges",
     "complex_clusters_from_edges",
     "complexes_are_similar",

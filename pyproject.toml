@@ -1,6 +1,6 @@
 [project]
 name = "ppisplit"
-version = "0.1.4"
+version = "0.2.0"
 description = "Sequence-aware cross-validation splitting and leak detection for protein-protein interaction datasets"
 readme = "README.md"
 license = { file = "LICENSE" }

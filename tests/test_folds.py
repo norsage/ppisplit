@@ -1,4 +1,4 @@
-from ppisplit.folds import assign_kfold, assign_montecarlo
+from ppisplit.folds import assign_kfold, assign_montecarlo, assign_montecarlo_balanced
 
 
 def test_kfold_each_uid_appears_once():
@@ -84,3 +84,65 @@ def test_montecarlo_reproducible_with_seed():
     df1 = assign_montecarlo(clusters, n_splits=3, val_ratio=0.3, seed=99)
     df2 = assign_montecarlo(clusters, n_splits=3, val_ratio=0.3, seed=99)
     assert df1.equals(df2)
+
+
+def _skewed_clusters() -> dict[int, list[str]]:
+    # One cluster of 60, three of 20 (21% of the UIDs), and 180 small ones of 1-4: 120 + 450 = 570 UIDs.
+    sizes = [60, 20, 20, 20] + [1 + i % 4 for i in range(180)]
+    return {cid: [f"c{cid}_{j}" for j in range(n)] for cid, n in enumerate(sizes)}
+
+
+def test_montecarlo_balanced_val_size_within_one_small_cluster():
+    clusters = _skewed_clusters()
+    total = sum(len(u) for u in clusters.values())
+    df = assign_montecarlo_balanced(clusters, n_splits=200, val_ratio=0.25, seed=0, large_threshold=10)
+    for f in range(200):
+        n_val = (df[f"split_{f}"] == "val").sum()
+        assert total * 0.25 - 4 < n_val <= total * 0.25
+
+
+def test_montecarlo_balanced_every_cluster_val_at_val_ratio():
+    # Large and small clusters alike land in val with probability ~ val_ratio.
+    clusters = _skewed_clusters()
+    n = 2000
+    df = assign_montecarlo_balanced(clusters, n_splits=n, val_ratio=0.25, seed=1, large_threshold=10)
+    is_val = (df.set_index("uid") == "val").to_numpy()
+    row = {uid: i for i, uid in enumerate(df["uid"])}
+    freq = {cid: is_val[row[uids[0]]].mean() for cid, uids in clusters.items()}
+    # Binomial sd at p=0.25, n=2000 is ~0.0097; skipping near the end lowers the larger small clusters a little.
+    for cid in range(4):
+        assert abs(freq[cid] - 0.25) < 0.04, (cid, freq[cid])
+    for k in (1, 2, 3, 4):
+        group = [f for cid, f in freq.items() if cid >= 4 and len(clusters[cid]) == k]
+        assert abs(sum(group) / len(group) - 0.25) < 0.02, (k, sum(group) / len(group))
+
+
+def test_montecarlo_balanced_weights_set_the_size():
+    # Two uids; "a" weighs 3 times "b". With val_ratio 0.25 of weight 4, only "b" fits.
+    clusters = {0: ["a"], 1: ["b"]}
+    df = assign_montecarlo_balanced(
+        clusters, n_splits=20, val_ratio=0.25, seed=0, large_threshold=10, weights={"a": 3, "b": 1}
+    )
+    assert (df.set_index("uid").loc["a"] == "train").all()
+    assert (df.set_index("uid").loc["b"] == "val").all()
+
+
+def test_montecarlo_balanced_cluster_atomicity():
+    clusters = _skewed_clusters()
+    df = assign_montecarlo_balanced(clusters, n_splits=20, val_ratio=0.25, seed=3, large_threshold=10)
+    labels = df.set_index("uid")
+    for uids in clusters.values():
+        assert (labels.loc[uids].nunique() == 1).all()
+
+
+def test_montecarlo_balanced_rejects_large_clusters_above_val_ratio():
+    import pytest
+    clusters = {0: [f"a{i}" for i in range(50)], 1: [f"b{i}" for i in range(50)]}
+    with pytest.raises(ValueError, match="large_threshold"):
+        assign_montecarlo_balanced(clusters, n_splits=1, val_ratio=0.25, seed=0, large_threshold=10)
+
+
+def test_montecarlo_balanced_rejects_missing_weight():
+    import pytest
+    with pytest.raises(ValueError, match="no weight"):
+        assign_montecarlo_balanced({0: ["a"], 1: ["b"]}, n_splits=1, weights={"a": 1.0})
