@@ -8,7 +8,11 @@ mode. See the README ("Three invariants").
 
 import pytest
 
-from ppisplit.cli import _load_predicate_from_params, _predicate_config_from_args, build_parser
+from ppisplit.cli import (
+    _load_predicate_from_params,
+    _predicate_config_from_args,
+    build_parser,
+)
 from ppisplit.predicates import COV_MODE_SYMMETRIC, HyperbolaPredicate
 from ppisplit.search import SEARCH_SETTINGS
 

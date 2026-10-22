@@ -35,7 +35,7 @@ import argparse
 import json
 import sys
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -67,7 +67,6 @@ from ppisplit.search import (
     run_mmseqs_search_allvall,
     run_mmseqs_search_pair,
 )
-
 
 HITS_FILENAME = "hits.parquet"
 PARAMS_FILENAME = "params.json"
@@ -199,7 +198,7 @@ def cmd_cluster(args: argparse.Namespace) -> None:
         "n_hits": len(hits),
         "csv_files": [str(p) for p in csv_paths],
         "pdb_dir": str(pdb_dir),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     (output_dir / PARAMS_FILENAME).write_text(json.dumps(params, indent=2))
     print(f"\nDone. Outputs in {output_dir}/")
@@ -525,7 +524,7 @@ def cmd_clean_test_set(args: argparse.Namespace) -> None:
         "test_uids_leaking": len(union_leaking_test),
         "test_uids_clean": len(clean_test),
         "leaking_per_train": {k: len(v) for k, v in leaking_test_by_train.items()},
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     (output_dir / "clean_params.json").write_text(json.dumps(clean_params, indent=2))
 

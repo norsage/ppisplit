@@ -36,7 +36,6 @@ import pandas as pd
 
 from ppisplit.types import ChainKey, ComplexInfo
 
-
 REQUIRED_COLUMNS = ("uid", "receptor_chains", "ligand_chains")
 
 SEQUENCE_SOURCES = ("seqres-trimmed", "resolved", "seqres")
@@ -241,7 +240,7 @@ def write_fasta(
                 sequences = extract_sequences_from_pdb(
                     pdb_path, sequence_source=sequence_source
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - any unreadable file is skipped with a warning, not fatal
                 print(f"  Warning: failed to parse {pdb_path}: {e}", file=sys.stderr)
                 continue
 

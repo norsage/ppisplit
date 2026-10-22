@@ -36,7 +36,6 @@ import pandas as pd
 
 from ppisplit.io import count_fasta_records
 
-
 SEARCH_SETTINGS: dict[str, float | int | None] = {
     "min_seq_id": 0.0,   # no identity floor; the post-filter admits fident >= 0.24
     "coverage": 0.0,     # no coverage filter at search time; post-filter handles it
@@ -99,7 +98,7 @@ def _run_easy_search(
         "--format-output", ",".join(HIT_COLUMNS),
     ]
     print(f"  Running: {' '.join(cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if result.returncode != 0:
         print(f"  mmseqs2 stderr:\n{result.stderr}", file=sys.stderr)
         raise RuntimeError(f"mmseqs2 search failed (exit {result.returncode})")

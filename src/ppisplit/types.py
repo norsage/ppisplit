@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-
 ChainKey = str  # "{uid}_{chain_id}"
 
 

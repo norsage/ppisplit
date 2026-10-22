@@ -47,16 +47,16 @@ from ppisplit.search import (
 from ppisplit.types import ChainKey, ComplexInfo, Hit
 
 __all__ = [
+    "DEFAULT_SEQUENCE_SOURCE",
+    "SEARCH_SETTINGS",
+    "SEQUENCE_SOURCES",
     "ChainKey",
     "ComplexInfo",
-    "DEFAULT_SEQUENCE_SOURCE",
     "EdgePredicate",
     "Hit",
     "HyperbolaPredicate",
     "LeakReport",
     "RectanglePredicate",
-    "SEARCH_SETTINGS",
-    "SEQUENCE_SOURCES",
     "UnionFind",
     "UnionOfPredicates",
     "assign_kfold",

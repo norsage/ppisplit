@@ -17,7 +17,6 @@ import pandas as pd
 from ppisplit.predicates import EdgePredicate
 from ppisplit.types import ChainKey
 
-
 _VALID_SIMILARITY_MODES = ("both", "receptor-only", "ligand-only", "either")
 
 # Columns carried in the ``evidence`` DataFrame in addition to the raw mmseqs

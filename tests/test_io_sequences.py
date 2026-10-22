@@ -15,7 +15,6 @@ from ppisplit.io import (
 )
 from ppisplit.types import ComplexInfo
 
-
 PDB_DIR = Path(__file__).resolve().parents[1] / "examples" / "pdb"
 
 
