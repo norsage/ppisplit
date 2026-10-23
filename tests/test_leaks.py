@@ -1,7 +1,7 @@
 import pandas as pd
 
 from ppisplit.leaks import detect_leaks
-from ppisplit.predicates import RectanglePredicate
+from ppisplit.predicates import HyperbolaPredicate, RectanglePredicate
 
 
 def make_chain_role(complexes_def):
@@ -173,3 +173,32 @@ def test_train_to_test_direction_is_ignored():
     pred = RectanglePredicate(0.3, 0.8, cov_mode=1)
     report = detect_leaks(hits, pred, chain_role, {"t1"}, {"n1"}, "both")
     assert report.leaking_pairs.empty
+
+
+def test_underscored_uids_are_matched_in_every_mode():
+    # Regression for 0004.k7l / 0003.5un: uids with "_" (`1jck_a_b`) were cut at
+    # the first "_", so no edge matched a uid and every mode reported nothing.
+    chain_role = make_chain_role(
+        [("2aq3_a_b", ["A"], ["B"]), ("1jck_a_b", ["A"], ["B"])]
+    )
+    hits = pd.DataFrame([
+        hit_row("2aq3_a_b_A", "1jck_a_b_A", pident=0.89, qcov=1.0, tcov=1.0),
+        hit_row("2aq3_a_b_B", "1jck_a_b_B", pident=0.95, qcov=1.0, tcov=1.0),
+    ])
+    pred = HyperbolaPredicate(0.24)
+    for mode in ("both", "either", "receptor-only", "ligand-only"):
+        report = detect_leaks(hits, pred, chain_role, {"2aq3_a_b"}, {"1jck_a_b"}, mode)
+        assert list(report.leaking_pairs.itertuples(index=False, name=None)) == [
+            ("2aq3_a_b", "1jck_a_b")
+        ], mode
+        assert set(report.evidence["query_chain"]) == {"A", "B"}
+
+
+def test_self_check_reports_leak():
+    chain_role = make_chain_role([("1jck_a_b", ["A"], ["B"])])
+    hits = pd.DataFrame([
+        hit_row("1jck_a_b_A", "1jck_a_b_A", pident=1.0, qcov=1.0, tcov=1.0),
+        hit_row("1jck_a_b_B", "1jck_a_b_B", pident=1.0, qcov=1.0, tcov=1.0),
+    ])
+    report = detect_leaks(hits, HyperbolaPredicate(0.24), chain_role, {"1jck_a_b"}, {"1jck_a_b"})
+    assert not report.leaking_pairs.empty
