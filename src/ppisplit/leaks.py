@@ -132,10 +132,12 @@ def detect_leaks(
     if edges.empty:
         return _direct_only_report()
 
-    edges["query_uid"] = edges["query"].str.split("_").str[0]
-    edges["query_chain"] = edges["query"].str.split("_").str[1]
-    edges["target_uid"] = edges["target"].str.split("_").str[0]
-    edges["target_chain"] = edges["target"].str.split("_").str[1]
+    # A uid may itself contain "_" (SKEMPI `1CSE_E_I`, `m001_1f3v`); a chain id
+    # never does, so the chain is the last field of the key.
+    for side in ("query", "target"):
+        parts = edges[side].str.rsplit("_", n=1)
+        edges[f"{side}_uid"] = parts.str[0]
+        edges[f"{side}_chain"] = parts.str[1]
     edges["query_role"] = edges["query"].map(chain_role)
     edges["target_role"] = edges["target"].map(chain_role)
     edges = edges.dropna(subset=["query_role", "target_role"])
